@@ -160,11 +160,11 @@ if ($Uninstall) {
     # Determine configuration file path by InstallPath or service location
     $configFilePath = ""
     if (-not $PSBoundParameters.ContainsKey('Installpath')) {
-        $configFilePath = [System.IO.Path]::GetDirectoryName($service.PathName) + "\config.json"
+        $servicePath = [System.IO.Path]::GetDirectoryName($service.PathName)
+        $exeIndex = $servicePath.IndexOf("\gophishusb-agent.exe")
+        $InstallPath = $servicePath.Substring(0, $exeIndex)
     }
-    else {
-        $configFilePath = $InstallPath + "\config.json"
-    }
+    $configFilePath = $InstallPath + "\config.json"
     if (-not (Test-Path $configFilePath)) {
         Write-Error "Could not find configuration file at $($configFilePath)."
     }
@@ -177,11 +177,20 @@ if ($Uninstall) {
     try {
         sc.exe stop $WinSrvName
         sc.exe delete $WinSrvName
-        Write-Host "Successfully uninstalled agent." -ForegroundColor Green
+        Start-Sleep -Seconds 2  # Wait for service to be removed before deleting the executable.
     }
     catch {
-        Write-Error "Error uninstalling agent."
+        Write-Error "Error uninstalling service."
     }
+
+    # Remove GophishUSB agent files
+    try {
+        Remove-Item -LiteralPath $InstallPath -Force -Recurse
+    }
+    catch {
+        Write-Error "Error removing GophishUSB agent files."
+    }
+    Write-Host "Successfully uninstalled agent." -ForegroundColor Green
 
     exit
 }
