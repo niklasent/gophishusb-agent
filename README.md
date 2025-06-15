@@ -1,4 +1,4 @@
-Gophish USB Windows Agent
+GophishUSB Windows Agent
 =======
 This repository contains the Windows target agent for [GophishUSB](https://github.com/niklasent/gophishusb).
 
