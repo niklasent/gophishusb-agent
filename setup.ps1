@@ -42,7 +42,7 @@
 
 param (
     [string]$AgentDownloadUrl,
-    [string]$GophishGroupID,
+    [string]$GophishusbGroupID,
     [Parameter(Mandatory = $true)]
     [string]$ApiKey,
     [Parameter(Mandatory = $true)]
@@ -198,7 +198,7 @@ if ($Uninstall) {
 }
 
 # STEP 1: Register target to group
-if (-not $PSBoundParameters.ContainsKey('GophishGroupID')) {
+if (-not $PSBoundParameters.ContainsKey('GophishusbGroupID')) {
     Write-Host "`nSearching for target groups..." -ForegroundColor Blue
     try {
         $groups = InvokeAPICall -path "groups/" -method "GET"
@@ -212,10 +212,10 @@ if (-not $PSBoundParameters.ContainsKey('GophishGroupID')) {
     }
     $groups | Format-Table id, name
     $group = ObtainTargetGroup -groups $groups
-    $GophishGroupID = $group.id
+    $GophishusbGroupID = $group.id
     Write-Host "`nRegistering target $($env:COMPUTERNAME) to group '$($group.name)'..." -ForegroundColor Blue
 }
-$target = RegisterTarget -groupID $GophishGroupID
+$target = RegisterTarget -groupID $GophishusbGroupID
 
 # STEP 2: Create agent configuration file
 $config = @{
