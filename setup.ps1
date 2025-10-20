@@ -41,9 +41,11 @@
 #>
 
 param (
-    [Parameter(Mandatory=$true)]
+    [string]$AgentDownloadUrl,
+    [string]$GophishGroupID,
+    [Parameter(Mandatory = $true)]
     [string]$ApiKey,
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
     [string]$AdminUrl,
     [string]$PhishUrl,
     [string]$InstallPath,
@@ -77,7 +79,7 @@ function InvokeAPICall {
 
     $headers = @{
         "Authorization" = "Bearer $ApiKey"
-        "Content-Type" = "application/json"
+        "Content-Type"  = "application/json"
     }
     $url = $API_URL + $path
     
@@ -129,7 +131,7 @@ function RegisterTarget {
     $body = @{  
         "group_id" = $groupID
         "hostname" = $hostname
-        "os" = $os
+        "os"       = $os
     }
 
     # Call API to register target
@@ -195,30 +197,31 @@ if ($Uninstall) {
     exit
 }
 
-# STEP 1: Obtain and select target group
-Write-Host "`nSearching for target groups..." -ForegroundColor Blue
-try {
-    $groups = InvokeAPICall -path "groups/" -method "GET"
+# STEP 1: Register target to group
+if (-not $PSBoundParameters.ContainsKey('GophishGroupID')) {
+    Write-Host "`nSearching for target groups..." -ForegroundColor Blue
+    try {
+        $groups = InvokeAPICall -path "groups/" -method "GET"
+    }
+    catch {
+        Write-Error "Error in HTTP request to $($url):"
+        Write-Error "Exception: $($_.Exception.Message)" 
+    }
+    if ($groups.Count -eq 0) {
+        Write-Error "No valid groups found! Aborting."
+    }
+    $groups | Format-Table id, name
+    $group = ObtainTargetGroup -groups $groups
+    $GophishGroupID = $group.id
+    Write-Host "`nRegistering target $($env:COMPUTERNAME) to group '$($group.name)'..." -ForegroundColor Blue
 }
-catch {
-    Write-Error "Error in HTTP request to $($url):"
-    Write-Error "Exception: $($_.Exception.Message)" 
-}
-if ($groups.Count -eq 0) {
-    Write-Error "No valid groups found! Aborting."
-}
-$groups | Format-Table id, name
-$group = ObtainTargetGroup -groups $groups
+$target = RegisterTarget -groupID $GophishGroupID
 
-# STEP 2: Register target to group
-Write-Host "`nRegistering target $($env:COMPUTERNAME) to group '$($group.name)'..." -ForegroundColor Blue
-$target = RegisterTarget -groupID $group.id
-
-# STEP 3: Create agent configuration file
+# STEP 2: Create agent configuration file
 $config = @{
-    "TargetID" = $target.id
+    "TargetID"     = $target.id
     "TargetApiKey" = $target.api_key
-    "PhishURL" = $PhishUrl
+    "PhishURL"     = $PhishUrl
 }
 
 $configJSON = $config | ConvertTo-Json -Depth 2
@@ -233,36 +236,56 @@ else {
     }
 }
 
-# STEP 4: Complle agent source code if not present
-if (Test-Path (Join-Path $PWD "bin/gophishusb-agent.exe")) {
+# STEP 3: Download / Build agent executable
+$srcFolder = Join-Path -Path $PSScriptRoot -ChildPath "src"
+$sourceFile = Join-Path -Path $srcFolder -ChildPath "gophishusb-agent.go"
+$binFolder = Join-Path -Path $PSScriptRoot -ChildPath "bin"
+$executableFile = Join-Path -Path $binFolder -ChildPath "gophishusb-agent.exe"
+if (Test-Path ($executableFile)) {
     Write-Host "Agent executable found."
 }
 else {
-    Write-Host "Cannot find agent executable. Building from source..." -ForegroundColor Blue
-    # Check for golang installation
-    try {
-        $goVersion = & go version
-        Write-Host "Go installation found:" -ForegroundColor Green
-        Write-Host "$goVersion"
-    } catch {
-        Write-Host "Go installation not found. Please install Go and rerun the installation script after." -ForegroundColor Red
-        Write-Host "https://go.dev/dl/"
-        exit
+    if ($PSBoundParameters.ContainsKey('AgentDownloadUrl')) {
+        Write-Host "Downloading agent..." -ForegroundColor Blue
+        if (-not (Test-Path -Path $binFolder)) {
+            New-Item -ItemType Directory -Path $binFolder | Out-Null
+        }
+        try {
+            Invoke-WebRequest -Uri $AgentDownloadUrl -OutFile $executableFile
+        }
+        catch {
+            Write-Host "Unable to download agent executable from $($AgentDownloadUrl)." -ForegroundColor Red
+            exit 
+        }
     }
-    Set-Location "$(Join-Path $PWD "src")"
-    go get .
-    go build -o "$(Join-Path $PWD "../bin/gophishusb-agent.exe")" "$(Join-Path $PWD "gophishusb-agent.go")"
-    Set-Location "$(Join-Path $PWD "..")"
+    else {
+        Write-Host "Building from source..." -ForegroundColor Blue
+        # Check for golang installation
+        try {
+            $goVersion = & go version
+            Write-Host "Go installation found:" -ForegroundColor Green
+            Write-Host "$goVersion"
+        }
+        catch {
+            Write-Host "Go installation not found. Please install Go and rerun the installation script after." -ForegroundColor Red
+            Write-Host "https://go.dev/dl/"
+            exit
+        }
+        Set-Location "$srcFolder"
+        go get .
+        go build -o "$executableFile" "$sourceFile"
+        Set-Location "$(Join-Path $PWD "..")"
+    }
 }
 
 Write-Host "`nRegistering target $($env:COMPUTERNAME) to group '$($group.name)'..." -ForegroundColor Blue
 
-# STEP 5: Copy files and install agent as Windows service
+# STEP 4: Copy files and install agent as Windows service
 if (-not (Test-Path -Path $InstallPath)) {
     New-Item -ItemType Directory -Path $InstallPath
 }
 
-Copy-Item -Path "bin/gophishusb-agent.exe" -Destination $InstallPath -Force
+Copy-Item -Path $executableFile -Destination $InstallPath -Force
 Move-Item -Path "config.json" -Destination $InstallPath -Force
 
 try {
