@@ -52,7 +52,7 @@ param (
     [switch]$Uninstall
 )
 
-##### Initialize global variables ans parameters #####
+##### Initialize global variables and parameters #####
 if (-not $PSBoundParameters.ContainsKey('Installpath')) {
     $InstallPath = "C:\gophishusb-agent\"
 }
