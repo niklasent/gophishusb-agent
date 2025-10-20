@@ -11,7 +11,7 @@
     setup.ps1 -InstallPath C:\gophishusb-agent\ -AdminUrl https://yourgophishusbserver.com:3333 -PhishUrl https://yourgophishusbserver.com -ApiKey <yourapikey>
 
 .EXAMPLE
-    setup.ps1 -InstallPath C:\gophishusb-agent\ -ApiKey <yourapikey> -Uninstall
+    setup.ps1 -InstallPath C:\gophishusb-agent\ -AdminUrl https://yourgophishusbserver.com:3333 -ApiKey <yourapikey> -Uninstall
 
 .AUTHOR
     Niklas Entschladen
