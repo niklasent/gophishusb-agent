@@ -194,7 +194,7 @@ func getConfig() (Config, error) {
 func (m *myService) Execute(args []string, r <-chan svc.ChangeRequest, status chan<- svc.Status) (bool, uint32) {
 
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown | svc.AcceptPauseAndContinue
-	tick := time.Tick(60 * time.Second)
+	tick := time.Tick(10 * time.Second)
 
 	status <- svc.Status{State: svc.StartPending}
 
